@@ -1,8 +1,9 @@
--- DeltaBXC UI Library by user request
+-- DeltaBXC UI Library (fixed)
+
 local DeltaBXC = {}
 DeltaBXC.__index = DeltaBXC
 
-local UserInputService = game:GetService("UserInputService")
+local UserInputService = game:GetService("UserInputService") -- Fixed: Proper service access
 
 local function create(class, props)
     local inst = Instance.new(class)
@@ -16,18 +17,21 @@ function DeltaBXC.new(title, size)
     local self = setmetatable({}, DeltaBXC)
     self.tabs = {}
 
-    -- Main UI frame
-    self.mainFrame = create("Frame", {
+    self.mainFrame = create("ScreenGui", { -- Fix: Added ScreenGui parent container (was Frame in CoreGui)
+        Name = "DeltaBXCUI",
+        ResetOnSpawn = false,
+        Parent = game:GetService("CoreGui")
+    })
+
+    self.container = create("Frame", {
         Size = UDim2.new(0, size.X, 0, size.Y),
         Position = UDim2.new(0.5, -size.X / 2, 0.5, -size.Y / 2),
         BackgroundColor3 = Color3.fromRGB(30, 30, 40),
         BorderSizePixel = 0,
-        Parent = game:GetService("CoreGui"),
-        Name = "DeltaBXCUI"
+        Parent = self.mainFrame
     })
-    create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.mainFrame})
+    create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.container})
 
-    -- Title bar
     self.titleBar = create("TextLabel", {
         Text = title or "DeltaBXC",
         Size = UDim2.new(1, 0, 0, 30),
@@ -35,24 +39,22 @@ function DeltaBXC.new(title, size)
         TextColor3 = Color3.fromRGB(255, 255, 255),
         Font = Enum.Font.GothamBold,
         TextSize = 16,
-        Parent = self.mainFrame
+        Parent = self.container
     })
     create("UICorner", {CornerRadius = UDim.new(0, 10), Parent = self.titleBar})
 
-    -- Tab bar
     self.tabBar = create("Frame", {
         Size = UDim2.new(0, 120, 1, -30),
         Position = UDim2.new(0, 0, 0, 30),
         BackgroundColor3 = Color3.fromRGB(35, 35, 50),
-        Parent = self.mainFrame
+        Parent = self.container
     })
 
-    -- Content area
     self.contentArea = create("Frame", {
         Size = UDim2.new(1, -120, 1, -30),
         Position = UDim2.new(0, 120, 0, 30),
         BackgroundTransparency = 1,
-        Parent = self.mainFrame
+        Parent = self.container
     })
 
     -- Dragging support (mobile + desktop)
@@ -63,14 +65,14 @@ function DeltaBXC.new(title, size)
 
     local function update(input)
         local delta = input.Position - self.dragStart
-        self.mainFrame.Position = UDim2.new(0, self.startPos.X.Offset + delta.X, 0, self.startPos.Y.Offset + delta.Y)
+        self.container.Position = UDim2.new(0, self.startPos.X.Offset + delta.X, 0, self.startPos.Y.Offset + delta.Y)
     end
 
     self.titleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             self.dragging = true
             self.dragStart = input.Position
-            self.startPos = self.mainFrame.Position
+            self.startPos = self.container.Position
 
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -185,7 +187,7 @@ function DeltaBXC:Tab(name)
     function tabObject:Dropdown(label, options, callback)
         local container = create("Frame", {
             Size = UDim2.new(0, 200, 0, 40),
-            BackgroundColor3 = Color3.fromRGB(50, 50, 70),
+            BackgroundColor = Color3.fromRGB(50, 50, 70),
             Parent = contentFrame
         })
         create("UICorner", {CornerRadius = UDim.new(0, 8), Parent = container})
