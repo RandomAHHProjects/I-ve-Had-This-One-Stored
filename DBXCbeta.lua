@@ -1,4 +1,5 @@
--- DeltaBXC2 - Rayfield style tab & element parenting fix
+-- DeltaBXC2 - Fixed tabs 
+
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 
@@ -24,22 +25,28 @@ local function new(class, props)
 	return inst
 end
 
+local function addUICorner(inst, radius)
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, radius)
+	corner.Parent = inst
+end
+
 function DeltaBXC2.new(title, size)
 	local self = setmetatable({}, DeltaBXC2)
 
 	local gui = new("ScreenGui", {
 		Name = "DeltaBXC2_UI",
 		ResetOnSpawn = false,
-		Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+		Parent = Players.LocalPlayer:WaitForChild("PlayerGui"),
 	})
 
 	local main = new("Frame", {
 		Size = UDim2.new(0, size.X, 0, size.Y),
 		Position = UDim2.new(0.5, -size.X / 2, 0.5, -size.Y / 2),
 		BackgroundColor3 = theme.background,
-		Parent = gui
+		Parent = gui,
 	})
-	new("UICorner", { CornerRadius = UDim.new(0, 10), Parent = main })
+	addUICorner(main, 10)
 
 	local titleBar = new("TextLabel", {
 		Size = UDim2.new(1, 0, 0, 30),
@@ -48,38 +55,43 @@ function DeltaBXC2.new(title, size)
 		TextColor3 = theme.text,
 		Font = Enum.Font.GothamBold,
 		TextSize = 16,
-		Parent = main
+		Parent = main,
 	})
 
 	local sidebar = new("Frame", {
 		Size = UDim2.new(0, 120, 1, -30),
 		Position = UDim2.new(0, 0, 0, 30),
 		BackgroundColor3 = theme.tab,
-		Parent = main
+		Parent = main,
 	})
-	new("UICorner", { CornerRadius = UDim.new(0, 8), Parent = sidebar })
-	new("UIListLayout", { Parent = sidebar, SortOrder = Enum.SortOrder.LayoutOrder })
+	addUICorner(sidebar, 8)
 
-	local content = new("Frame", {
+	local sidebarLayout = Instance.new("UIListLayout")
+	sidebarLayout.Padding = UDim.new(0, 6)
+	sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	sidebarLayout.Parent = sidebar
+
+	local contentHolder = new("Frame", {
 		Size = UDim2.new(1, -120, 1, -30),
 		Position = UDim2.new(0, 120, 0, 30),
 		BackgroundTransparency = 1,
-		Parent = main
+		Parent = main,
 	})
 
 	self._gui = gui
 	self._main = main
+	self._sidebar = sidebar
+	self._contentHolder = contentHolder
 	self._tabs = {}
-	self._content = content
-	self._active = nil
+	self._activeTab = nil
 
-	-- Dragging window
+	-- Dragging logic for main window
 	do
-		local dragging, startPos, startInput
+		local dragging, dragStart, startPos
 		titleBar.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = true
-				startInput = input.Position
+				dragStart = input.Position
 				startPos = main.Position
 				input.Changed:Connect(function()
 					if input.UserInputState == Enum.UserInputState.End then
@@ -90,68 +102,59 @@ function DeltaBXC2.new(title, size)
 		end)
 		UserInputService.InputChanged:Connect(function(input)
 			if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-				local delta = input.Position - startInput
+				local delta = input.Position - dragStart
 				main.Position = UDim2.new(0, startPos.X.Offset + delta.X, 0, startPos.Y.Offset + delta.Y)
 			end
 		end)
 	end
 
 	function self:CreateTab(name)
-		-- Sidebar button
-		local tabBtn = new("TextButton", {
+		local btn = new("TextButton", {
 			Text = name,
 			Size = UDim2.new(1, 0, 0, 40),
 			BackgroundColor3 = theme.tab,
 			TextColor3 = theme.text,
 			Font = Enum.Font.Gotham,
 			TextSize = 14,
-			Parent = sidebar,
+			Parent = self._sidebar,
 			AutoButtonColor = false,
 		})
-		new("UICorner", { Parent = tabBtn, CornerRadius = UDim.new(0, 6) })
+		addUICorner(btn, 6)
 
-		-- Content frame
-		local tabFrame = new("ScrollingFrame", {
+		local frame = new("ScrollingFrame", {
 			Size = UDim2.new(1, 0, 1, 0),
 			CanvasSize = UDim2.new(0, 0, 1, 0),
 			BackgroundTransparency = 1,
 			Visible = false,
-			ScrollBarThickness = 4,
-			Parent = content,
+			ScrollBarThickness = 6,
+			Parent = self._contentHolder,
 			AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		})
 
-		local layout = new("UIListLayout", {
-			Parent = tabFrame,
-			SortOrder = Enum.SortOrder.LayoutOrder,
-			Padding = UDim.new(0, 6),
-		})
-		new("UIPadding", {
-			Parent = tabFrame,
-			PaddingLeft = UDim.new(0, 10),
-			PaddingTop = UDim.new(0, 10),
-			PaddingRight = UDim.new(0, 10),
-		})
+		local layout = Instance.new("UIListLayout", frame)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, 6)
+		local padding = Instance.new("UIPadding", frame)
+		padding.PaddingLeft = UDim.new(0, 10)
+		padding.PaddingTop = UDim.new(0, 10)
+		padding.PaddingRight = UDim.new(0, 10)
 
-		-- Tab selection logic
-		tabBtn.MouseButton1Click:Connect(function()
-			if self._active then
-				self._active.btn.BackgroundColor3 = theme.tab
-				self._active.frame.Visible = false
-			end
-			tabBtn.BackgroundColor3 = theme.tab_selected
-			tabFrame.Visible = true
-			self._active = { btn = tabBtn, frame = tabFrame }
+		self._tabs[name] = {
+			Button = btn,
+			Frame = frame
+		}
+
+		btn.MouseButton1Click:Connect(function()
+			self:SelectTab(name)
 		end)
 
-		if not self._active then
-			tabBtn:MouseButton1Click()
+		if not self._activeTab then
+			self:SelectTab(name)
 		end
 
-		local tab = {}
-		tab._frame = tabFrame
+		local tabAPI = {}
 
-		function tab:CreateButton(text, callback)
+		function tabAPI:CreateButton(text, callback)
 			local btn = new("TextButton", {
 				Text = text or "Button",
 				Size = UDim2.new(1, 0, 0, 36),
@@ -159,18 +162,17 @@ function DeltaBXC2.new(title, size)
 				TextColor3 = theme.text,
 				Font = Enum.Font.GothamBold,
 				TextSize = 16,
-				Parent = self._frame,
+				Parent = frame,
 				AutoButtonColor = false,
 			})
-			new("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 8) })
+			addUICorner(btn, 8)
 			btn.MouseButton1Click:Connect(function()
-				if callback then
-					callback()
-				end
+				if callback then callback() end
 			end)
+			return btn
 		end
 
-		function tab:CreateTextbox(placeholder, callback)
+		function tabAPI:CreateTextbox(placeholder, callback)
 			local box = new("TextBox", {
 				Text = "",
 				PlaceholderText = placeholder or "Enter text...",
@@ -179,33 +181,30 @@ function DeltaBXC2.new(title, size)
 				TextColor3 = theme.text,
 				Font = Enum.Font.Gotham,
 				TextSize = 14,
-				Parent = self._frame,
+				Parent = frame,
 			})
-			new("UICorner", { Parent = box, CornerRadius = UDim.new(0, 8) })
-
+			addUICorner(box, 8)
 			box.FocusLost:Connect(function(enterPressed)
 				if enterPressed and callback then
 					callback(box.Text)
 				end
 			end)
-
 			function box:GetValue()
 				return box.Text
 			end
 			function box:SetValue(v)
 				box.Text = v
 			end
-
 			return box
 		end
 
-		function tab:CreateToggle(text, default, callback)
+		function tabAPI:CreateToggle(text, default, callback)
 			local state = default or false
 
 			local holder = new("Frame", {
 				Size = UDim2.new(1, 0, 0, 32),
 				BackgroundTransparency = 1,
-				Parent = self._frame,
+				Parent = frame,
 			})
 
 			new("TextLabel", {
@@ -227,7 +226,7 @@ function DeltaBXC2.new(title, size)
 				Parent = holder,
 				AutoButtonColor = false,
 			})
-			new("UICorner", { Parent = toggleBtn, CornerRadius = UDim.new(0, 12) })
+			addUICorner(toggleBtn, 12)
 
 			local function update(val)
 				state = val
@@ -251,14 +250,14 @@ function DeltaBXC2.new(title, size)
 			return toggleBtn
 		end
 
-		function tab:CreateSelector(label, list, callback)
+		function tabAPI:CreateSelector(label, list, callback)
 			local current = 1
-			local frame = new("Frame", {
+			local container = new("Frame", {
 				Size = UDim2.new(1, 0, 0, 34),
 				BackgroundColor3 = theme.selector,
-				Parent = self._frame,
+				Parent = frame,
 			})
-			new("UICorner", { Parent = frame, CornerRadius = UDim.new(0, 8) })
+			addUICorner(container, 8)
 
 			new("TextLabel", {
 				Text = label or "Select",
@@ -267,7 +266,7 @@ function DeltaBXC2.new(title, size)
 				TextColor3 = theme.text,
 				Font = Enum.Font.GothamSemibold,
 				TextSize = 14,
-				Parent = frame,
+				Parent = container,
 			})
 
 			local left = new("TextButton", {
@@ -278,9 +277,9 @@ function DeltaBXC2.new(title, size)
 				TextColor3 = theme.text,
 				Font = Enum.Font.GothamBold,
 				TextSize = 14,
-				Parent = frame,
+				Parent = container,
 			})
-			new("UICorner", { Parent = left, CornerRadius = UDim.new(0, 6) })
+			addUICorner(left, 6)
 
 			local right = new("TextButton", {
 				Text = ">",
@@ -290,9 +289,9 @@ function DeltaBXC2.new(title, size)
 				TextColor3 = theme.text,
 				Font = Enum.Font.GothamBold,
 				TextSize = 14,
-				Parent = frame,
+				Parent = container,
 			})
-			new("UICorner", { Parent = right, CornerRadius = UDim.new(0, 6) })
+			addUICorner(right, 6)
 
 			local display = new("TextLabel", {
 				Text = list[1],
@@ -302,9 +301,9 @@ function DeltaBXC2.new(title, size)
 				TextColor3 = theme.text,
 				Font = Enum.Font.Gotham,
 				TextSize = 14,
-				Parent = frame,
+				Parent = container,
 			})
-			new("UICorner", { Parent = display, CornerRadius = UDim.new(0, 6) })
+			addUICorner(display, 6)
 
 			local function update()
 				display.Text = list[current]
@@ -336,7 +335,16 @@ function DeltaBXC2.new(title, size)
 			}
 		end
 
-		return tab
+		return tabAPI
+	end
+
+	function self:SelectTab(name)
+		for tabName, tabData in pairs(self._tabs) do
+			local selected = (tabName == name)
+			tabData.Frame.Visible = selected
+			tabData.Button.BackgroundColor3 = selected and theme.tab_selected or theme.tab
+		end
+		self._activeTab = name
 	end
 
 	return self
