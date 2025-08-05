@@ -1,13 +1,12 @@
--- DeltaBXC UI Library (fixed with explicit checks)
+local UserInputService = game:GetService("UserInputService")
 
 local DeltaBXC = {}
 DeltaBXC.__index = DeltaBXC
 
-local UserInputService = game:GetService("UserInputService")
-
-local function create(class, props)
+-- Utility function for creating instances with properties
+local function newInstance(class, props)
     local inst = Instance.new(class)
-    for k, v in pairs(props) do
+    for k, v in pairs(props or {}) do
         inst[k] = v
     end
     return inst
@@ -15,250 +14,301 @@ end
 
 function DeltaBXC.new(title, size)
     local self = setmetatable({}, DeltaBXC)
-    self.tabs = {}
 
-    -- Create ScreenGui container for UI
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "DeltaBXCUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = game:GetService("CoreGui")
-    self.screenGui = screenGui
+    -- ScreenGui container
+    local screenGui = newInstance("ScreenGui", {
+        Name = "DeltaBXC_UI",
+        ResetOnSpawn = false,
+        Parent = game:GetService("CoreGui"),
+    })
 
-    -- Main container frame inside ScreenGui
-    local container = create("Frame", {
+    -- Main window frame
+    local window = newInstance("Frame", {
         Size = UDim2.new(0, size.X, 0, size.Y),
         Position = UDim2.new(0.5, -size.X/2, 0.5, -size.Y/2),
-        BackgroundColor3 = Color3.fromRGB(30, 30, 40),
-        BorderSizePixel = 0,
-        Parent = screenGui
+        BackgroundColor3 = Color3.fromRGB(30,30,40),
+        Parent = screenGui,
     })
-    create("UICorner", {CornerRadius = UDim.new(0,10), Parent = container})
-    self.container = container
+    newInstance("UICorner", {Parent = window, CornerRadius = UDim.new(0, 12)})
 
-    local titleBar = create("TextLabel", {
+    -- Title bar for dragging
+    local titleBar = newInstance("TextLabel", {
         Text = title or "DeltaBXC",
-        Size = UDim2.new(1, 0, 0, 30),
-        BackgroundColor3 = Color3.fromRGB(45, 45, 60),
+        Size = UDim2.new(1,0,0,32),
+        BackgroundColor3 = Color3.fromRGB(45,45,60),
         TextColor3 = Color3.fromRGB(255,255,255),
         Font = Enum.Font.GothamBold,
-        TextSize = 16,
-        Parent = container
+        TextSize = 18,
+        Parent = window,
     })
-    create("UICorner", {CornerRadius = UDim.new(0,10), Parent = titleBar})
-    self.titleBar = titleBar
+    newInstance("UICorner", {Parent = titleBar, CornerRadius = UDim.new(0, 12)})
 
-    local tabBar = create("Frame", {
-        Size = UDim2.new(0, 120, 1, -30),
-        Position = UDim2.new(0, 0, 0, 30),
-        BackgroundColor3 = Color3.fromRGB(35, 35, 50),
-        Parent = container
+    -- Left tab container
+    local tabContainer = newInstance("Frame", {
+        Size = UDim2.new(0, 140, 1, -32),
+        Position = UDim2.new(0, 0, 0, 32),
+        BackgroundColor3 = Color3.fromRGB(40,40,60),
+        Parent = window,
     })
-    self.tabBar = tabBar
+    newInstance("UICorner", {Parent = tabContainer, CornerRadius = UDim.new(0, 8)})
 
-    local contentArea = create("Frame", {
-        Size = UDim2.new(1, -120, 1, -30),
-        Position = UDim2.new(0, 120, 0, 30),
+    -- Tab buttons list layout
+    local tabButtonLayout = newInstance("UIListLayout", {Parent = tabContainer})
+    tabButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabButtonLayout.Padding = UDim.new(0, 6)
+
+    -- Content area container
+    local contentContainer = newInstance("Frame", {
+        Size = UDim2.new(1, -140, 1, -32),
+        Position = UDim2.new(0, 140, 0, 32),
         BackgroundTransparency = 1,
-        Parent = container
+        Parent = window,
     })
-    self.contentArea = contentArea
 
-    -- Dragging variables
-    self.dragging = false
-    self.dragInput = nil
-    self.dragStart = nil
-    self.startPos = nil
+    -- Dragging support
+    do
+        local dragging, dragInput, dragStart, startPos
+        local function update(input)
+            local delta = input.Position - dragStart
+            window.Position = UDim2.new(0, startPos.X.Offset + delta.X, 0, startPos.Y.Offset + delta.Y)
+        end
+        titleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = window.Position
 
-    local function update(input)
-        local delta = input.Position - self.dragStart
-        container.Position = UDim2.new(0, self.startPos.X.Offset + delta.X, 0, self.startPos.Y.Offset + delta.Y)
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
+        titleBar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                dragInput = input
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                update(input)
+            end
+        end)
     end
 
-    titleBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            self.dragging = true
-            self.dragStart = input.Position
-            self.startPos = container.Position
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    self.dragging = false
-                end
-            end)
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if input == self.dragInput and self.dragging then
-            update(input)
-        end
-    end)
-
-    titleBar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
-            self.dragInput = input
-        end
-    end)
+    -- Store tabs and current selection
+    self.screenGui = screenGui
+    self.window = window
+    self.tabContainer = tabContainer
+    self.contentContainer = contentContainer
+    self.tabButtonLayout = tabButtonLayout
+    self.tabs = {}
+    self.currentTab = nil
 
     return self
 end
 
-function DeltaBXC:Tab(name)
-    -- Ensure tabBar exists
-    assert(self.tabBar and self.contentArea, "UI not properly initialized")
+function DeltaBXC:CreateTab(name)
+    assert(type(name) == "string", "Tab name must be a string")
+    local tab = {}
 
-    local tabBtn = Instance.new("TextButton")
-    tabBtn.Text = name or "Tab"
-    tabBtn.Size = UDim2.new(1, -20, 0, 40)
-    tabBtn.Position = UDim2.new(0, 10, 0, (#self.tabs)*45 + 10)
-    tabBtn.BackgroundColor3 = Color3.fromRGB(60,60,90)
-    tabBtn.TextColor3 = Color3.fromRGB(220,220,230)
-    tabBtn.Font = Enum.Font.GothamSemibold
-    tabBtn.TextSize = 16
-    tabBtn.Parent = self.tabBar
-    tabBtn.AutoButtonColor = false
-    local uicorner = Instance.new("UICorner")
-    uicorner.CornerRadius = UDim.new(0, 8)
-    uicorner.Parent = tabBtn
+    -- Tab button
+    local tabButton = newInstance("TextButton", {
+        Text = name,
+        Size = UDim2.new(1, -12, 0, 38),
+        BackgroundColor3 = Color3.fromRGB(55,55,85),
+        TextColor3 = Color3.fromRGB(220,220,255),
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 16,
+        Parent = self.tabContainer,
+        AutoButtonColor = false,
+    })
+    newInstance("UICorner", {Parent = tabButton, CornerRadius = UDim.new(0, 10)})
 
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, 0, 1, 0)
-    contentFrame.BackgroundTransparency = 1
+    -- Content frame
+    local contentFrame = newInstance("ScrollingFrame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        CanvasSize = UDim2.new(),
+        ScrollBarThickness = 4,
+        ScrollBarImageColor3 = Color3.fromRGB(100,100,150),
+        BackgroundTransparency = 1,
+        Parent = self.contentContainer,
+    })
     contentFrame.Visible = false
-    contentFrame.Parent = self.contentArea
+    contentFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
-    local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 6)
+    -- Layout inside content frame
+    local layout = newInstance("UIListLayout", {Parent = contentFrame})
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Parent = contentFrame
+    layout.Padding = UDim.new(0, 8)
 
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0,10)
-    padding.PaddingLeft = UDim.new(0,10)
-    padding.PaddingRight = UDim.new(0,10)
-    padding.Parent = contentFrame
+    local padding = newInstance("UIPadding", {Parent = contentFrame})
+    padding.PaddingLeft = UDim.new(0, 10)
+    padding.PaddingRight = UDim.new(0, 10)
+    padding.PaddingTop = UDim.new(0, 10)
 
-    tabBtn.MouseButton1Click:Connect(function()
+    -- Select tab function
+    local function select()
         if self.currentTab then
-            self.currentTab.frame.Visible = false
-            self.currentTab.button.BackgroundColor3 = Color3.fromRGB(60,60,90)
+            self.currentTab.content.Visible = false
+            self.currentTab.button.BackgroundColor3 = Color3.fromRGB(55,55,85)
         end
-        tabBtn.BackgroundColor3 = Color3.fromRGB(90,90,130)
+        tabButton.BackgroundColor3 = Color3.fromRGB(90,90,130)
         contentFrame.Visible = true
-        self.currentTab = {button = tabBtn, frame = contentFrame}
-    end)
-
-    if #self.tabs == 0 then
-        tabBtn:MouseButton1Click()
+        self.currentTab = {button = tabButton, content = contentFrame}
     end
 
-    local tabObject = {}
+    tabButton.MouseButton1Click:Connect(select)
 
-    function tabObject:Textbox(placeholder, callback)
-        local textbox = Instance.new("TextBox")
-        textbox.Size = UDim2.new(0, 200, 0, 30)
-        textbox.PlaceholderText = placeholder or "Enter text..."
-        textbox.Text = ""
-        textbox.Font = Enum.Font.Gotham
-        textbox.TextSize = 16
-        textbox.TextColor3 = Color3.fromRGB(230,230,255)
-        textbox.BackgroundColor3 = Color3.fromRGB(50,50,70)
-        textbox.ClearTextOnFocus = true
-        textbox.Parent = contentFrame
+    -- Auto-select first tab
+    if #self.tabs == 0 then
+        select()
+    end
 
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 8)
-        corner.Parent = textbox
+    -- Elements API on tab
+    function tab:CreateButton(text, callback)
+        local btn = newInstance("TextButton", {
+            Text = text or "Button",
+            Size = UDim2.new(1, 0, 0, 38),
+            BackgroundColor3 = Color3.fromRGB(120, 60, 180),
+            TextColor3 = Color3.fromRGB(240, 240, 255),
+            Font = Enum.Font.GothamBold,
+            TextSize = 18,
+            Parent = contentFrame,
+        })
+        newInstance("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 12)})
+        btn.MouseButton1Click:Connect(function()
+            if callback then callback() end
+        end)
+        return btn
+    end
 
+    function tab:CreateTextbox(placeholder, callback)
+        local textbox = newInstance("TextBox", {
+            PlaceholderText = placeholder or "Enter text...",
+            Size = UDim2.new(1, 0, 0, 30),
+            BackgroundColor3 = Color3.fromRGB(60, 60, 90),
+            TextColor3 = Color3.fromRGB(220, 220, 240),
+            Font = Enum.Font.Gotham,
+            TextSize = 16,
+            ClearTextOnFocus = true,
+            Parent = contentFrame,
+        })
+        newInstance("UICorner", {Parent = textbox, CornerRadius = UDim.new(0, 10)})
         textbox.FocusLost:Connect(function(enterPressed)
             if enterPressed and callback then
                 callback(textbox.Text)
             end
         end)
-
         return textbox
     end
 
-    function tabObject:Button(text, callback)
-        local btn = Instance.new("TextButton")
-        btn.Text = text or "Button"
-        btn.Size = UDim2.new(0, 140, 0, 35)
-        btn.BackgroundColor3 = Color3.fromRGB(100, 60, 160)
-        btn.TextColor3 = Color3.fromRGB(230, 230, 255)
-        btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 16
-        btn.Parent = contentFrame
+    function tab:CreateToggle(text, default, callback)
+        local toggleFrame = newInstance("Frame", {
+            Size = UDim2.new(1, 0, 0, 34),
+            BackgroundTransparency = 1,
+            Parent = contentFrame,
+        })
 
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 10)
-        corner.Parent = btn
+        local label = newInstance("TextLabel", {
+            Text = text or "Toggle",
+            Size = UDim2.new(0.75, 0, 1, 0),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(220, 220, 240),
+            Font = Enum.Font.Gotham,
+            TextSize = 16,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = toggleFrame,
+        })
 
-        btn.MouseButton1Click:Connect(function()
-            if callback then callback() end
+        local toggleBtn = newInstance("TextButton", {
+            Size = UDim2.new(0, 40, 0, 24),
+            Position = UDim2.new(1, -45, 0.5, -12),
+            BackgroundColor3 = default and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(100, 100, 100),
+            AutoButtonColor = false,
+            Parent = toggleFrame,
+            Text = "",
+        })
+        newInstance("UICorner", {Parent = toggleBtn, CornerRadius = UDim.new(0, 12)})
+
+        local toggled = default or false
+
+        local function updateState(state)
+            toggled = state
+            toggleBtn.BackgroundColor3 = toggled and Color3.fromRGB(80, 200, 120) or Color3.fromRGB(100, 100, 100)
+            if callback then
+                callback(toggled)
+            end
+        end
+
+        toggleBtn.MouseButton1Click:Connect(function()
+            updateState(not toggled)
         end)
 
-        return btn
+        return toggleFrame
     end
 
-    function tabObject:Dropdown(label, options, callback)
-        local container = Instance.new("Frame")
-        container.Size = UDim2.new(0, 200, 0, 40)
-        container.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-        container.Parent = contentFrame
+    function tab:CreateDropdown(label, options, callback)
+        local container = newInstance("Frame", {
+            Size = UDim2.new(1, 0, 0, 36),
+            BackgroundColor3 = Color3.fromRGB(50, 50, 80),
+            Parent = contentFrame,
+        })
+        newInstance("UICorner", {Parent = container, CornerRadius = UDim.new(0, 10)})
 
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 8)
-        corner.Parent = container
+        local title = newInstance("TextLabel", {
+            Text = label or "Dropdown",
+            Size = UDim2.new(1, 0, 0, 14),
+            BackgroundTransparency = 1,
+            TextColor3 = Color3.fromRGB(230, 230, 255),
+            Font = Enum.Font.GothamSemibold,
+            TextSize = 14,
+            Parent = container,
+        })
 
-        local title = Instance.new("TextLabel")
-        title.Text = label or "Dropdown"
-        title.Size = UDim2.new(1, 0, 0, 14)
-        title.Position = UDim2.new(0, 0, 0, -18)
-        title.TextColor3 = Color3.fromRGB(230, 230, 255)
-        title.BackgroundTransparency = 1
-        title.Font = Enum.Font.GothamSemibold
-        title.TextSize = 14
-        title.Parent = container
+        local scroll = newInstance("ScrollingFrame", {
+            Size = UDim2.new(1, 0, 0, 20),
+            Position = UDim2.new(0, 0, 0, 14),
+            BackgroundTransparency = 1,
+            ScrollBarThickness = 3,
+            ScrollingDirection = Enum.ScrollingDirection.X,
+            Parent = container,
+        })
 
-        local scroll = Instance.new("ScrollingFrame")
-        scroll.Size = UDim2.new(1, 0, 1, 0)
-        scroll.CanvasSize = UDim2.new(0, #options * 100, 0, 40)
-        scroll.ScrollBarThickness = 2
-        scroll.ScrollingDirection = Enum.ScrollingDirection.X
-        scroll.BackgroundTransparency = 1
-        scroll.Parent = container
+        local layout = newInstance("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Parent = scroll,
+            Padding = UDim.new(0, 6),
+        })
 
-        local layout = Instance.new("UIListLayout")
-        layout.FillDirection = Enum.FillDirection.Horizontal
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Parent = scroll
-
-        for _, opt in ipairs(options) do
-            local btn = Instance.new("TextButton")
-            btn.Text = tostring(opt)
-            btn.Size = UDim2.new(0, 90, 0, 30)
-            btn.BackgroundColor3 = Color3.fromRGB(100, 60, 160)
-            btn.TextColor3 = Color3.fromRGB(240, 240, 255)
-            btn.Font = Enum.Font.Gotham
-            btn.TextSize = 14
-            btn.Parent = scroll
-
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(0, 6)
-            btnCorner.Parent = btn
+        -- Add option buttons
+        for _, option in ipairs(options) do
+            local btn = newInstance("TextButton", {
+                Text = tostring(option),
+                Size = UDim2.new(0, 100, 1, 0),
+                BackgroundColor3 = Color3.fromRGB(100, 60, 160),
+                TextColor3 = Color3.fromRGB(240, 240, 255),
+                Font = Enum.Font.Gotham,
+                TextSize = 14,
+                Parent = scroll,
+                AutoButtonColor = false,
+            })
+            newInstance("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 8)})
 
             btn.MouseButton1Click:Connect(function()
-                if callback then
-                    callback(opt)
-                end
+                if callback then callback(option) end
             end)
         end
 
         return container
     end
 
-    table.insert(self.tabs, tabObject)
-    return tabObject
+    -- Register this tab
+    table.insert(self.tabs, tab)
+
+    return tab
 end
 
 return DeltaBXC
