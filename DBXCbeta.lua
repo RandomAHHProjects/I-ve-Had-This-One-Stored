@@ -1,5 +1,3 @@
--- DeltaBXC2 UI Library (Full Features, draggable window, tabs, textboxes, toggles, dropdowns, side selectors, close button)
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
@@ -159,6 +157,21 @@ function DeltaBXC2.new(title, size)
         end)
     end
 
+    -- Utility function to update CanvasSize based on content size
+    local function updateCanvasSize(scrollingFrame)
+        local layout = scrollingFrame:FindFirstChildOfClass("UIListLayout")
+        if layout then
+            local padding = scrollingFrame:FindFirstChildOfClass("UIPadding")
+            local totalPadding = 0
+            if padding then
+                totalPadding = padding.PaddingTop.Offset + padding.PaddingBottom.Offset
+            end
+
+            local contentSize = layout.AbsoluteContentSize
+            scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, contentSize.Y + totalPadding)
+        end
+    end
+
     -- Tab creation
     function self:CreateTab(name)
         local tabBtn = new("TextButton", {
@@ -213,6 +226,11 @@ function DeltaBXC2.new(title, size)
         tab.name = name
         tab.frame = tabFrame
 
+        -- After adding elements, call this to update scroll
+        local function refreshCanvas()
+            updateCanvasSize(tabFrame)
+        end
+
         -- Button element
         function tab:CreateButton(text, callback)
             local btn = new("TextButton", {
@@ -224,12 +242,15 @@ function DeltaBXC2.new(title, size)
                 TextSize = 18,
                 AutoButtonColor = false,
                 Parent = tabFrame,
+                LayoutOrder = #tabFrame:GetChildren(),
             })
             new("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 14)})
 
             btn.MouseButton1Click:Connect(function()
                 if callback then callback() end
             end)
+
+            refreshCanvas()
             return btn
         end
 
@@ -245,6 +266,7 @@ function DeltaBXC2.new(title, size)
                 TextSize = 16,
                 ClearTextOnFocus = false,
                 Parent = tabFrame,
+                LayoutOrder = #tabFrame:GetChildren(),
             })
             new("UICorner", {Parent = box, CornerRadius = UDim.new(0, 14)})
 
@@ -261,6 +283,7 @@ function DeltaBXC2.new(title, size)
                 box.Text = val
             end
 
+            refreshCanvas()
             return box
         end
 
@@ -272,6 +295,7 @@ function DeltaBXC2.new(title, size)
                 Size = UDim2.new(1, 0, 0, 36),
                 BackgroundTransparency = 1,
                 Parent = tabFrame,
+                LayoutOrder = #tabFrame:GetChildren(),
             })
 
             local label = new("TextLabel", {
@@ -314,6 +338,7 @@ function DeltaBXC2.new(title, size)
             end
 
             updateVisual()
+            refreshCanvas()
             return holder
         end
 
@@ -326,6 +351,7 @@ function DeltaBXC2.new(title, size)
                 Size = UDim2.new(1, 0, 0, 38),
                 BackgroundTransparency = 1,
                 Parent = tabFrame,
+                LayoutOrder = #tabFrame:GetChildren(),
             })
 
             local label = new("TextLabel", {
@@ -425,6 +451,7 @@ function DeltaBXC2.new(title, size)
 
             dropdownBtn.Text = "..."
 
+            refreshCanvas()
             return holder
         end
 
@@ -437,6 +464,7 @@ function DeltaBXC2.new(title, size)
                 Size = UDim2.new(1, 0, 0, 42),
                 BackgroundTransparency = 1,
                 Parent = tabFrame,
+                LayoutOrder = #tabFrame:GetChildren(),
             })
 
             local label = new("TextLabel", {
@@ -525,6 +553,7 @@ function DeltaBXC2.new(title, size)
             end
 
             updateDisplay()
+            refreshCanvas()
             return holder
         end
 
