@@ -1,331 +1,537 @@
--- DeltaBXC2 UI Library (Full Feature Set, No Notifications)
--- Features: Tabs, Textboxes, Toggles, Dropdowns, Side Selectors, Dragging, Close Button
+-- DeltaBXC2 UI Library (Full Features, draggable window, tabs, textboxes, toggles, dropdowns, side selectors, close button)
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
+
+local player = Players.LocalPlayer
+
+-- Prevent multiple instances:
+if player.PlayerGui:FindFirstChild("DeltaBXC2_UI") then
+    player:Kick("Already loaded DeltaBXC2 UI.")
+    return
+end
+
+local theme = {
+    background = Color3.fromRGB(20, 10, 30),
+    tab = Color3.fromRGB(50, 30, 80),
+    tab_selected = Color3.fromRGB(120, 50, 170),
+    text = Color3.fromRGB(240, 220, 255),
+    button = Color3.fromRGB(120, 50, 170),
+    toggle_on = Color3.fromRGB(0, 200, 100),
+    toggle_off = Color3.fromRGB(70, 70, 90),
+    selector = Color3.fromRGB(90, 60, 140),
+}
+
+local function new(class, props)
+    local inst = Instance.new(class)
+    if props then
+        for k, v in pairs(props) do
+            inst[k] = v
+        end
+    end
+    return inst
+end
 
 local DeltaBXC2 = {}
 DeltaBXC2.__index = DeltaBXC2
 
-local function new(class, props)
-	local inst = Instance.new(class)
-	for k, v in pairs(props) do
-		inst[k] = v
-	end
-	return inst
-end
+function DeltaBXC2.new(title, size)
+    local self = setmetatable({}, DeltaBXC2)
 
-local theme = {
-	background = Color3.fromRGB(25, 25, 35),
-	tab = Color3.fromRGB(40, 40, 60),
-	tab_selected = Color3.fromRGB(60, 60, 90),
-	text = Color3.fromRGB(240, 240, 255),
-	button = Color3.fromRGB(120, 60, 180),
-	toggle_on = Color3.fromRGB(0, 200, 100),
-	toggle_off = Color3.fromRGB(100, 100, 100),
-	selector = Color3.fromRGB(90, 60, 140),
-	close_hover = Color3.fromRGB(200, 60, 60),
-}
+    -- Root GUI
+    local gui = new("ScreenGui", {
+        Name = "DeltaBXC2_UI",
+        Parent = player:WaitForChild("PlayerGui"),
+        ResetOnSpawn = false,
+    })
 
--- Prevent duplicates
-if Players.LocalPlayer.PlayerGui:FindFirstChild("DeltaBXC2_UI") then
-	Players.LocalPlayer:Kick("Already loaded DeltaBXC2 UI.")
-	return
-end
+    -- Main frame
+    local main = new("Frame", {
+        Size = size or UDim2.new(0, 520, 0, 360),
+        Position = UDim2.new(0.5, -260, 0.5, -180),
+        BackgroundColor3 = theme.background,
+        Parent = gui,
+    })
+    new("UICorner", {Parent = main, CornerRadius = UDim.new(0, 14)})
 
-function DeltaBXC2.new(title)
-	local self = setmetatable({}, DeltaBXC2)
+    -- Top bar for dragging + close button
+    local topBar = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 36),
+        BackgroundColor3 = theme.tab,
+        Parent = main,
+    })
+    new("UICorner", {Parent = topBar, CornerRadius = UDim.new(0, 14)})
 
-	local gui = new("ScreenGui", {
-		Name = "DeltaBXC2_UI",
-		ResetOnSpawn = false,
-		Parent = Players.LocalPlayer:WaitForChild("PlayerGui"),
-	})
+    local titleLabel = new("TextLabel", {
+        Text = title or "DeltaBXC2 UI",
+        Size = UDim2.new(0.8, 0, 1, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = theme.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 20,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Position = UDim2.new(0, 14, 0, 0),
+        Parent = topBar,
+    })
 
-	local main = new("Frame", {
-		Size = UDim2.new(0, 500, 0, 350),
-		Position = UDim2.new(0.5, -250, 0.5, -175),
-		BackgroundColor3 = theme.background,
-		Parent = gui,
-	})
-	new("UICorner", {Parent = main, CornerRadius = UDim.new(0, 8)})
+    local closeBtn = new("TextButton", {
+        Text = "✕",
+        Size = UDim2.new(0, 40, 1, 0),
+        Position = UDim2.new(1, -50, 0, 0),
+        BackgroundColor3 = theme.button,
+        TextColor3 = theme.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 24,
+        AutoButtonColor = false,
+        Parent = topBar,
+    })
+    new("UICorner", {Parent = closeBtn, CornerRadius = UDim.new(0, 14)})
 
-	local topbar = new("Frame", {
-		Size = UDim2.new(1, 0, 0, 32),
-		BackgroundColor3 = theme.tab,
-		Parent = main,
-	})
-	new("UICorner", {Parent = topbar, CornerRadius = UDim.new(0, 8)})
+    closeBtn.MouseButton1Click:Connect(function()
+        gui:Destroy()
+    end)
 
-	local titleLabel = new("TextLabel", {
-		Text = title or "DeltaBXC2",
-		Size = UDim2.new(1, -40, 1, 0),
-		Position = UDim2.new(0, 8, 0, 0),
-		BackgroundTransparency = 1,
-		TextColor3 = theme.text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 16,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Parent = topbar,
-	})
+    -- Sidebar for tabs
+    local sidebar = new("Frame", {
+        Size = UDim2.new(0, 140, 1, -36),
+        Position = UDim2.new(0, 0, 0, 36),
+        BackgroundColor3 = theme.tab,
+        Parent = main,
+    })
+    new("UICorner", {Parent = sidebar, CornerRadius = UDim.new(0, 14)})
 
-	local closeBtn = new("TextButton", {
-		Size = UDim2.new(0, 32, 0, 32),
-		Position = UDim2.new(1, -32, 0, 0),
-		Text = "X",
-		TextColor3 = theme.text,
-		Font = Enum.Font.GothamBold,
-		TextSize = 18,
-		BackgroundTransparency = 1,
-		Parent = topbar,
-	})
-	closeBtn.MouseEnter:Connect(function()
-		closeBtn.BackgroundTransparency = 0
-		closeBtn.BackgroundColor3 = theme.close_hover
-	end)
-	closeBtn.MouseLeave:Connect(function()
-		closeBtn.BackgroundTransparency = 1
-	end)
-	closeBtn.MouseButton1Click:Connect(function()
-		gui:Destroy()
-	end)
+    local sidebarLayout = new("UIListLayout", {
+        Parent = sidebar,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Padding = UDim.new(0, 8),
+    })
+    local sidebarPadding = new("UIPadding", {
+        Parent = sidebar,
+        PaddingTop = UDim.new(0, 14),
+        PaddingLeft = UDim.new(0, 12),
+        PaddingRight = UDim.new(0, 12),
+    })
 
-	-- Dragging
-	do
-		local dragging = false
-		local dragStart, startPos
+    -- Content area for tabs
+    local content = new("Frame", {
+        Size = UDim2.new(1, -140, 1, -36),
+        Position = UDim2.new(0, 140, 0, 36),
+        BackgroundTransparency = 1,
+        Parent = main,
+    })
 
-		topbar.InputBegan:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				dragging = true
-				dragStart = input.Position
-				startPos = main.Position
-			end
-		end)
+    self._gui = gui
+    self._main = main
+    self._tabs = {}
+    self._content = content
+    self._active = nil
 
-		UserInputService.InputChanged:Connect(function(input)
-			if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-				local delta = input.Position - dragStart
-				main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-			end
-		end)
+    -- Drag support for main window
+    do
+        local dragging = false
+        local dragStartPos
+        local frameStartPos
 
-		topbar.InputEnded:Connect(function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
-				dragging = false
-			end
-		end)
-	end
+        topBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStartPos = input.Position
+                frameStartPos = main.Position
 
-	-- Sidebar
-	local sidebar = new("Frame", {
-		Size = UDim2.new(0, 120, 1, -32),
-		Position = UDim2.new(0, 0, 0, 32),
-		BackgroundColor3 = theme.tab,
-		Parent = main,
-	})
-	new("UICorner", {Parent = sidebar, CornerRadius = UDim.new(0, 6)})
-	new("UIListLayout", {
-		Parent = sidebar,
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		Padding = UDim.new(0, 6),
-	})
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        dragging = false
+                    end
+                end)
+            end
+        end)
 
-	-- Content
-	local content = new("Frame", {
-		Size = UDim2.new(1, -120, 1, -32),
-		Position = UDim2.new(0, 120, 0, 32),
-		BackgroundTransparency = 1,
-		Parent = main,
-	})
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStartPos
+                main.Position = UDim2.new(
+                    0,
+                    frameStartPos.X.Offset + delta.X,
+                    0,
+                    frameStartPos.Y.Offset + delta.Y
+                )
+            end
+        end)
+    end
 
-	self._gui = gui
-	self._tabs = {}
-	self._activeTab = nil
+    -- Tab creation
+    function self:CreateTab(name)
+        local tabBtn = new("TextButton", {
+            Text = name,
+            Size = UDim2.new(1, 0, 0, 44),
+            BackgroundColor3 = theme.tab,
+            TextColor3 = theme.text,
+            Font = Enum.Font.Gotham,
+            TextSize = 16,
+            AutoButtonColor = false,
+            Parent = sidebar,
+        })
+        new("UICorner", {Parent = tabBtn, CornerRadius = UDim.new(0, 12)})
 
-	function self:CreateTab(name)
-		local tabBtn = new("TextButton", {
-			Text = name,
-			Size = UDim2.new(1, 0, 0, 32),
-			BackgroundColor3 = theme.tab,
-			TextColor3 = theme.text,
-			Font = Enum.Font.Gotham,
-			TextSize = 14,
-			Parent = sidebar,
-			AutoButtonColor = false,
-		})
-		new("UICorner", {Parent = tabBtn, CornerRadius = UDim.new(0, 6)})
+        local tabFrame = new("ScrollingFrame", {
+            Size = UDim2.new(1, 0, 1, 0),
+            BackgroundTransparency = 1,
+            ScrollBarThickness = 6,
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+            VerticalScrollBarInset = Enum.ScrollBarInset.Always,
+            Parent = content,
+            Visible = false,
+        })
+        local tabLayout = new("UIListLayout", {
+            Parent = tabFrame,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            Padding = UDim.new(0, 10),
+        })
+        local tabPadding = new("UIPadding", {
+            Parent = tabFrame,
+            PaddingTop = UDim.new(0, 14),
+            PaddingLeft = UDim.new(0, 14),
+            PaddingRight = UDim.new(0, 14),
+            PaddingBottom = UDim.new(0, 14),
+        })
 
-		local tabFrame = new("ScrollingFrame", {
-			Size = UDim2.new(1, 0, 1, 0),
-			CanvasSize = UDim2.new(0, 0, 0, 0),
-			BackgroundTransparency = 1,
-			Visible = false,
-			ScrollBarThickness = 4,
-			Parent = content,
-			AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		})
-		new("UIListLayout", {Parent = tabFrame, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 6)})
-		new("UIPadding", {
-			Parent = tabFrame,
-			PaddingTop = UDim.new(0, 8),
-			PaddingLeft = UDim.new(0, 10),
-			PaddingRight = UDim.new(0, 10),
-		})
+        tabBtn.MouseButton1Click:Connect(function()
+            if self._active then
+                self._active.btn.BackgroundColor3 = theme.tab
+                self._active.frame.Visible = false
+            end
+            tabBtn.BackgroundColor3 = theme.tab_selected
+            tabFrame.Visible = true
+            self._active = {btn = tabBtn, frame = tabFrame}
+        end)
 
-		tabBtn.MouseButton1Click:Connect(function()
-			if self._activeTab then
-				self._activeTab.btn.BackgroundColor3 = theme.tab
-				self._activeTab.frame.Visible = false
-			end
-			tabBtn.BackgroundColor3 = theme.tab_selected
-			tabFrame.Visible = true
-			self._activeTab = {btn = tabBtn, frame = tabFrame}
-		end)
+        if not self._active then
+            tabBtn:MouseButton1Click()
+        end
 
-		if not self._activeTab then
-			tabBtn:MouseButton1Click()
-		end
+        local tab = {}
+        tab.name = name
+        tab.frame = tabFrame
 
-		local tab = {}
+        -- Button element
+        function tab:CreateButton(text, callback)
+            local btn = new("TextButton", {
+                Text = text or "Button",
+                Size = UDim2.new(1, 0, 0, 40),
+                BackgroundColor3 = theme.button,
+                TextColor3 = theme.text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 18,
+                AutoButtonColor = false,
+                Parent = tabFrame,
+            })
+            new("UICorner", {Parent = btn, CornerRadius = UDim.new(0, 14)})
 
-		function tab:Textbox(placeholder, callback)
-			local box = new("TextBox", {
-				Text = "",
-				PlaceholderText = placeholder or "Enter text...",
-				Size = UDim2.new(1, 0, 0, 32),
-				BackgroundColor3 = theme.tab_selected,
-				TextColor3 = theme.text,
-				Font = Enum.Font.Gotham,
-				TextSize = 14,
-				Parent = tabFrame,
-			})
-			new("UICorner", {Parent = box, CornerRadius = UDim.new(0, 6)})
+            btn.MouseButton1Click:Connect(function()
+                if callback then callback() end
+            end)
+            return btn
+        end
 
-			box.FocusLost:Connect(function(enter)
-				if enter and callback then
-					callback(box.Text)
-				end
-			end)
-			return box
-		end
+        -- Textbox element
+        function tab:CreateTextbox(placeholder, callback)
+            local box = new("TextBox", {
+                PlaceholderText = placeholder or "Enter text...",
+                Text = "",
+                Size = UDim2.new(1, 0, 0, 36),
+                BackgroundColor3 = theme.tab_selected,
+                TextColor3 = theme.text,
+                Font = Enum.Font.Gotham,
+                TextSize = 16,
+                ClearTextOnFocus = false,
+                Parent = tabFrame,
+            })
+            new("UICorner", {Parent = box, CornerRadius = UDim.new(0, 14)})
 
-		function tab:Toggle(text, default, callback)
-			local state = default or false
+            box.FocusLost:Connect(function(enterPressed)
+                if enterPressed and callback then
+                    callback(box.Text)
+                end
+            end)
 
-			local holder = new("Frame", {
-				Size = UDim2.new(1, 0, 0, 32),
-				BackgroundTransparency = 1,
-				Parent = tabFrame,
-			})
+            function box:GetValue()
+                return box.Text
+            end
+            function box:SetValue(val)
+                box.Text = val
+            end
 
-			local label = new("TextLabel", {
-				Text = text,
-				Size = UDim2.new(0.7, 0, 1, 0),
-				TextColor3 = theme.text,
-				BackgroundTransparency = 1,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Font = Enum.Font.Gotham,
-				TextSize = 14,
-				Parent = holder,
-			})
+            return box
+        end
 
-			local toggle = new("TextButton", {
-				Size = UDim2.new(0, 40, 0, 24),
-				Position = UDim2.new(1, -50, 0.5, -12),
-				BackgroundColor3 = state and theme.toggle_on or theme.toggle_off,
-				Text = "",
-				Parent = holder,
-				AutoButtonColor = false,
-			})
-			new("UICorner", {Parent = toggle, CornerRadius = UDim.new(0, 12)})
+        -- Toggle element
+        function tab:CreateToggle(text, default, callback)
+            local state = default or false
 
-			toggle.MouseButton1Click:Connect(function()
-				state = not state
-				toggle.BackgroundColor3 = state and theme.toggle_on or theme.toggle_off
-				if callback then callback(state) end
-			end)
+            local holder = new("Frame", {
+                Size = UDim2.new(1, 0, 0, 36),
+                BackgroundTransparency = 1,
+                Parent = tabFrame,
+            })
 
-			return toggle
-		end
+            local label = new("TextLabel", {
+                Text = text or "Toggle",
+                Size = UDim2.new(0.7, 0, 1, 0),
+                BackgroundTransparency = 1,
+                TextColor3 = theme.text,
+                Font = Enum.Font.Gotham,
+                TextSize = 16,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = holder,
+            })
 
-		function tab:Dropdown(labelText, options, callback)
-			local current = options[1] or ""
-			local label = new("TextLabel", {
-				Text = labelText or "Dropdown",
-				Size = UDim2.new(1, 0, 0, 24),
-				TextColor3 = theme.text,
-				TextXAlignment = Enum.TextXAlignment.Left,
-				Font = Enum.Font.Gotham,
-				TextSize = 14,
-				BackgroundTransparency = 1,
-				Parent = tabFrame,
-			})
+            local toggleBtn = new("TextButton", {
+                Size = UDim2.new(0, 40, 0, 24),
+                Position = UDim2.new(1, -46, 0.5, -12),
+                BackgroundColor3 = state and theme.toggle_on or theme.toggle_off,
+                Text = "",
+                AutoButtonColor = false,
+                Parent = holder,
+            })
+            new("UICorner", {Parent = toggleBtn, CornerRadius = UDim.new(0, 12)})
 
-			local holder = new("Frame", {
-				Size = UDim2.new(1, 0, 0, 36),
-				BackgroundColor3 = theme.selector,
-				Parent = tabFrame,
-			})
-			new("UICorner", {Parent = holder, CornerRadius = UDim.new(0, 6)})
+            local function updateVisual()
+                toggleBtn.BackgroundColor3 = state and theme.toggle_on or theme.toggle_off
+            end
 
-			local left = new("TextButton", {
-				Text = "<",
-				Size = UDim2.new(0, 30, 1, 0),
-				BackgroundTransparency = 1,
-				TextColor3 = theme.text,
-				Font = Enum.Font.GothamBold,
-				TextSize = 18,
-				Parent = holder,
-			})
-			local center = new("TextLabel", {
-				Text = current,
-				Size = UDim2.new(1, -60, 1, 0),
-				Position = UDim2.new(0, 30, 0, 0),
-				BackgroundTransparency = 1,
-				TextColor3 = theme.text,
-				Font = Enum.Font.Gotham,
-				TextSize = 16,
-				Parent = holder,
-			})
-			local right = new("TextButton", {
-				Text = ">",
-				Size = UDim2.new(0, 30, 1, 0),
-				Position = UDim2.new(1, -30, 0, 0),
-				BackgroundTransparency = 1,
-				TextColor3 = theme.text,
-				Font = Enum.Font.GothamBold,
-				TextSize = 18,
-				Parent = holder,
-			})
+            toggleBtn.MouseButton1Click:Connect(function()
+                state = not state
+                updateVisual()
+                if callback then callback(state) end
+            end)
 
-			local index = 1
-			local function update()
-				current = options[index]
-				center.Text = current
-				if callback then callback(current) end
-			end
+            function holder:GetValue()
+                return state
+            end
+            function holder:SetValue(val)
+                state = val and true or false
+                updateVisual()
+            end
 
-			left.MouseButton1Click:Connect(function()
-				index = (index - 2) % #options + 1
-				update()
-			end)
-			right.MouseButton1Click:Connect(function()
-				index = index % #options + 1
-				update()
-			end)
+            updateVisual()
+            return holder
+        end
 
-			update()
-			return holder
-		end
+        -- Dropdown (single select)
+        function tab:CreateDropdown(labelText, options, callback)
+            options = options or {}
+            local selected = nil
 
-		self._tabs[name] = tab
-		return tab
-	end
+            local holder = new("Frame", {
+                Size = UDim2.new(1, 0, 0, 38),
+                BackgroundTransparency = 1,
+                Parent = tabFrame,
+            })
 
-	return self
+            local label = new("TextLabel", {
+                Text = labelText or "Dropdown",
+                Size = UDim2.new(0.5, 0, 1, 0),
+                BackgroundTransparency = 1,
+                TextColor3 = theme.text,
+                Font = Enum.Font.Gotham,
+                TextSize = 16,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = holder,
+            })
+
+            local dropdownBtn = new("TextButton", {
+                Size = UDim2.new(0.5, -8, 1, 0),
+                Position = UDim2.new(0.5, 8, 0, 0),
+                Text = "...",
+                BackgroundColor3 = theme.selector,
+                TextColor3 = theme.text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 20,
+                AutoButtonColor = false,
+                Parent = holder,
+            })
+            new("UICorner", {Parent = dropdownBtn, CornerRadius = UDim.new(0, 14)})
+
+            local listFrame = new("Frame", {
+                Size = UDim2.new(0, 180, 0, 0),
+                Position = UDim2.new(0, 0, 1, 6),
+                BackgroundColor3 = theme.tab,
+                Visible = false,
+                ClipsDescendants = true,
+                Parent = holder,
+            })
+            new("UICorner", {Parent = listFrame, CornerRadius = UDim.new(0, 14)})
+
+            local layout = new("UIListLayout", {
+                Parent = listFrame,
+                SortOrder = Enum.SortOrder.LayoutOrder,
+            })
+            local padding = new("UIPadding", {
+                Parent = listFrame,
+                PaddingLeft = UDim.new(0, 8),
+                PaddingRight = UDim.new(0, 8),
+                PaddingTop = UDim.new(0, 8),
+                PaddingBottom = UDim.new(0, 8),
+            })
+
+            local function updateListSize()
+                listFrame.Size = UDim2.new(0, 180, 0, #options * 32 + 16)
+            end
+            updateListSize()
+
+            for _, option in ipairs(options) do
+                local optBtn = new("TextButton", {
+                    Text = option,
+                    Size = UDim2.new(1, 0, 0, 30),
+                    BackgroundColor3 = theme.tab,
+                    TextColor3 = theme.text,
+                    Font = Enum.Font.Gotham,
+                    TextSize = 16,
+                    AutoButtonColor = false,
+                    Parent = listFrame,
+                })
+                new("UICorner", {Parent = optBtn, CornerRadius = UDim.new(0, 10)})
+
+                optBtn.MouseButton1Click:Connect(function()
+                    selected = option
+                    dropdownBtn.Text = option
+                    listFrame.Visible = false
+                    if callback then
+                        callback(option)
+                    end
+                end)
+            end
+
+            dropdownBtn.MouseButton1Click:Connect(function()
+                listFrame.Visible = not listFrame.Visible
+            end)
+
+            -- Close dropdown if clicked outside
+            UserInputService.InputBegan:Connect(function(input, processed)
+                if not processed and input.UserInputType == Enum.UserInputType.MouseButton1 and listFrame.Visible then
+                    if not holder:IsAncestorOf(input.Target) then
+                        listFrame.Visible = false
+                    end
+                end
+            end)
+
+            function holder:GetValue()
+                return selected
+            end
+            function holder:SetValue(val)
+                selected = val
+                dropdownBtn.Text = val or "..."
+            end
+
+            dropdownBtn.Text = "..."
+
+            return holder
+        end
+
+        -- Side-scroller selector element (left/right buttons cycling options)
+        function tab:CreateSideSelector(labelText, options, callback)
+            options = options or {}
+            local selectedIndex = 1
+
+            local holder = new("Frame", {
+                Size = UDim2.new(1, 0, 0, 42),
+                BackgroundTransparency = 1,
+                Parent = tabFrame,
+            })
+
+            local label = new("TextLabel", {
+                Text = labelText or "Selector",
+                Size = UDim2.new(0.4, 0, 1, 0),
+                BackgroundTransparency = 1,
+                TextColor3 = theme.text,
+                Font = Enum.Font.Gotham,
+                TextSize = 16,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = holder,
+            })
+
+            local leftBtn = new("TextButton", {
+                Text = "<",
+                Size = UDim2.new(0, 36, 0, 36),
+                Position = UDim2.new(0.4, 6, 0, 3),
+                BackgroundColor3 = theme.selector,
+                TextColor3 = theme.text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 20,
+                AutoButtonColor = false,
+                Parent = holder,
+            })
+            new("UICorner", {Parent = leftBtn, CornerRadius = UDim.new(0, 12)})
+
+            local rightBtn = new("TextButton", {
+                Text = ">",
+                Size = UDim2.new(0, 36, 0, 36),
+                Position = UDim2.new(0.85, -42, 0, 3),
+                BackgroundColor3 = theme.selector,
+                TextColor3 = theme.text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 20,
+                AutoButtonColor = false,
+                Parent = holder,
+            })
+            new("UICorner", {Parent = rightBtn, CornerRadius = UDim.new(0, 12)})
+
+            local displayLabel = new("TextLabel", {
+                Text = options[selectedIndex] or "...",
+                Size = UDim2.new(0.4, 0, 1, 0),
+                Position = UDim2.new(0.5, 0, 0, 0),
+                BackgroundTransparency = 1,
+                TextColor3 = theme.text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 16,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                Parent = holder,
+            })
+
+            local function updateDisplay()
+                displayLabel.Text = options[selectedIndex] or "..."
+                if callback then
+                    callback(options[selectedIndex], selectedIndex)
+                end
+            end
+
+            leftBtn.MouseButton1Click:Connect(function()
+                selectedIndex = selectedIndex - 1
+                if selectedIndex < 1 then selectedIndex = #options end
+                updateDisplay()
+            end)
+
+            rightBtn.MouseButton1Click:Connect(function()
+                selectedIndex = selectedIndex + 1
+                if selectedIndex > #options then selectedIndex = 1 end
+                updateDisplay()
+            end)
+
+            function holder:GetValue()
+                return options[selectedIndex], selectedIndex
+            end
+            function holder:SetValue(valueOrIndex)
+                if type(valueOrIndex) == "number" then
+                    selectedIndex = math.clamp(valueOrIndex, 1, #options)
+                else
+                    for i, v in ipairs(options) do
+                        if v == valueOrIndex then
+                            selectedIndex = i
+                            break
+                        end
+                    end
+                end
+                updateDisplay()
+            end
+
+            updateDisplay()
+            return holder
+        end
+
+        return tab
+    end
+
+    return self
 end
 
 return DeltaBXC2
